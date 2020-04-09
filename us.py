@@ -4,17 +4,20 @@ import sys
 import os.path
 import pandas as pd
 from datetime import date, timedelta
+from multiprocessing import Pool
 
 from covid import i18n, Styles, CovidPlot, DailyPlot, OOPlot
 
 
 try:
-    from my_config_us import csv_dir, outdir
+    from my_config_us import csv_dir, outdir, n_proc
 
 except ModuleNotFoundError:
     csv_dir = '../COVID-19-world/csse_covid_19_data/csse_covid_19_daily_reports'
     homedir = os.getenv('HOME')
     outdir = os.path.join(homedir, 'public_html/coronavirus/us')
+    n_proc = 1
+    
 
 last_update = sys.argv[1]
 
@@ -73,6 +76,37 @@ try:
 except FileExistsError:
     pass
 
+def plot_state(state):
+    print(state)
+    html = '<H2>%s</H2><a name="%s"></a>' % (state, state)
+
+    p = CovidPlot('en', title=state)
+    p.plot(*extract(csv_all, state, 'Confirmed'), label='Total cases', **Styles.totalecasi)
+    p.plot(*extract(csv_all, state, 'Deaths'), label='Deaths', **Styles.deceduti)
+    p.expfit(*extract(csv_all, state, 'Confirmed'), **Styles.expfit1)
+    p.expfit(*extract(csv_all, state, 'Deaths'), **Styles.expfit2)
+    html += p.save(os.path.join(outdir,'%s.png' % state))
+
+    p = DailyPlot('en', title='%s - daily cases' % state)
+    p.plot(*extract(csv_all, state, 'Confirmed'), label='New cases', **Styles.totalecasi)
+    p.plot(*extract(csv_all, state, 'Deaths'), label='Deaths', **Styles.deceduti)
+    html += p.save(os.path.join(outdir, '%s_daily.png' % state))
+
+    p = OOPlot('en', title='%s - Cases' % state)
+    _, cases = extract(csv_all, state, 'Confirmed')
+    p.plot(cases, smooth=False, **Styles.faintline)
+    p.plot(cases)
+    html += p.save(os.path.join(outdir, '%s_cases_oo.png' % state))
+
+    p = OOPlot('en', title='%s - Deaths' % state,
+                       xlabel='NumberOfDeaths',
+                       ylabel='NumberOfDailyDeaths')
+    _, cases = extract(csv_all, state, 'Deaths')
+    p.plot(cases, smooth=False, **Styles.faintline)
+    p.plot(cases)
+    html += p.save(os.path.join(outdir, '%s_deaths_oo.png' % state))
+    return html
+
 with open(os.path.join(outdir, 'index.html'), 'w') as f:
 
     csv_all = parse_all(csv_dir)
@@ -81,34 +115,10 @@ with open(os.path.join(outdir, 'index.html'), 'w') as f:
     for state in sorted(states_list()):
         f.write('<a href="#%s">%s</a> ' % (state, state))
 
-    for state in sorted(states_list()):
-        print(state)
-        f.write('<H2>%s</H2><a name="%s"></a>' % (state, state))
-        p = CovidPlot('en', title=state)
-        p.plot(*extract(csv_all, state, 'Confirmed'), label='Total cases', **Styles.totalecasi)
-        p.plot(*extract(csv_all, state, 'Deaths'), label='Deaths', **Styles.deceduti)
-        p.expfit(*extract(csv_all, state, 'Confirmed'), **Styles.expfit1)
-        p.expfit(*extract(csv_all, state, 'Deaths'), **Styles.expfit2)
-        f.write(p.save(os.path.join(outdir,'%s.png' % state)))
+    with Pool(n_proc) as p:
+        html = p.map(plot_state, sorted(states_list()))
 
-        p = DailyPlot('en', title='%s - daily cases' % state)
-        p.plot(*extract(csv_all, state, 'Confirmed'), label='New cases', **Styles.totalecasi)
-        p.plot(*extract(csv_all, state, 'Deaths'), label='Deaths', **Styles.deceduti)
-        f.write(p.save(os.path.join(outdir, '%s_daily.png' % state)))
-
-        p = OOPlot('en', title='%s - Cases' % state)
-        _, cases = extract(csv_all, state, 'Confirmed')
-        p.plot(cases, smooth=False, **Styles.faintline)
-        p.plot(cases)
-        f.write(p.save(os.path.join(outdir, '%s_cases_oo.png' % state)))
-
-        p = OOPlot('en', title='%s - Deaths' % state,
-                           xlabel='NumberOfDeaths',
-                           ylabel='NumberOfDailyDeaths')
-        _, cases = extract(csv_all, state, 'Deaths')
-        p.plot(cases, smooth=False, **Styles.faintline)
-        p.plot(cases)
-        f.write(p.save(os.path.join(outdir, '%s_deaths_oo.png' % state)))
+    f.write('\n'.join(html))
 
 
 

@@ -3,17 +3,19 @@
 import os
 import sys
 import pandas as pd
+from multiprocessing import Pool
 
 
 from covid import i18n, Styles, CovidPlot, DailyPlot, Table, TestsPlot, OOPlot
 
 try:
-    from my_config_italia import csv_dir, outdir
+    from my_config_italia import csv_dir, outdir, n_proc
 
 except ModuleNotFoundError:
     csv_dir = '../COVID-19-italia'
     homedir = os.getenv('HOME')
     outdir = os.path.join(homedir, 'public_html/coronavirus/italia')
+    n_proc = 1
 
 
 csv_province = os.path.join(csv_dir, 'dati-province/dpc-covid19-ita-province.csv')
@@ -63,6 +65,68 @@ try:
     os.makedirs(outdir)
 except FileExistsError:
     pass
+
+def plot_provincia(provincia):
+    print(provincia)
+    html = '<H2>%s</H2><a name="%s"></a>' % (provincia, provincia)
+
+    p = CovidPlot('it', title=provincia, ymax=1e5)
+    p.plot(*casi_provincia(provincia), label='Casi totali', **Styles.totalecasi)
+    p.expfit(*casi_provincia(provincia), **Styles.expfit1)
+    html += p.save(os.path.join(outdir,'%s.png' % provincia))
+
+    p = DailyPlot('it', title='%s - casi giornalieri' % provincia)
+    p.plot(*casi_provincia(provincia), label='Nuovi casi', **Styles.totalecasi)
+    html += p.save(os.path.join(outdir, '%s_giornalieri.png' % provincia))
+
+    p = OOPlot('it', title='%s - numero di casi' % provincia)
+    _, totale_casi = casi_provincia(provincia)
+    p.plot(totale_casi, smooth=False, **Styles.faintline)
+    p.plot(totale_casi)
+    html += p.save(os.path.join(outdir, '%s_casi_oo.png' % provincia))
+    return html
+
+def plot_regione(regione):
+    print(regione)
+    html = '<H2>%s</H2><a name="%s"></a>' % (regione, regione)
+    p = CovidPlot('it', title=regione)
+    p.plot(*dati_regione(regione, 'totale_casi'), label='Casi totali', **Styles.totalecasi)
+    p.plot(*dati_regione(regione, 'terapia_intensiva'), label='Terapia intensiva', **Styles.ti)
+    p.plot(*dati_regione(regione, 'deceduti'), label='Deceduti', **Styles.deceduti)
+    p.expfit(*dati_regione(regione, 'totale_casi'), **Styles.expfit1)
+    p.expfit(*dati_regione(regione, 'deceduti'), **Styles.expfit2)
+    html += p.save(os.path.join(outdir,'%s.png' % regione))
+
+    p = DailyPlot('it', title='%s - casi giornalieri' % regione)
+    p.plot(*dati_regione(regione, 'totale_casi'), label='Nuovi casi', **Styles.totalecasi)
+    p.plot(*dati_regione(regione, 'deceduti'), label='Deceduti', **Styles.deceduti)
+    html += p.save(os.path.join(outdir, '%s_giornalieri.png' % regione))
+
+    p = TestsPlot('it', title='%s - tamponi' % regione)
+    data, totale_casi = dati_regione(regione, 'totale_casi')
+    _, tamponi = dati_regione(regione, 'tamponi')
+    nuovi_casi = totale_casi[1:] - totale_casi[:-1]
+    nuovi_tamponi = tamponi[1:] - tamponi[:-1]
+    p.plot(data.to_numpy()[1:], nuovi_tamponi, label='Tamponi', width=0.40, color='gray')
+    p.plot(data.to_numpy()[1:], nuovi_casi, label='Nuovi casi', shift=0.40, width=0.40, color='red')
+    html += p.save(os.path.join(outdir, '%s_tamponi.png' % regione))
+
+    p = OOPlot('it', title='%s - numero di casi' % regione)
+    _, totale_casi = dati_regione(regione, 'totale_casi')
+    p.plot(totale_casi, smooth=False, **Styles.faintline)
+    p.plot(totale_casi)
+    html += p.save(os.path.join(outdir, '%s_casi_oo.png' % regione))
+
+    p = OOPlot('it', title='%s - decessi' % regione,
+               xlabel='NumberOfDeaths',
+               ylabel='NumberOfDailyDeaths')
+    _, totale_casi = dati_regione(regione, 'deceduti')
+    p.plot(totale_casi, smooth=False, **Styles.faintline)
+    p.plot(totale_casi)
+    html += p.save(os.path.join(outdir, '%s_deceduti_oo.png' % regione))
+    return html
+
+
 
 with open(os.path.join(outdir, 'index.html'), 'w') as f:
     f.write('Ultimo aggiornamento: %s<br>' % last_update)
@@ -128,68 +192,25 @@ with open(os.path.join(outdir, 'index.html'), 'w') as f:
     p.plot(totale_casi)
     f.write(p.save(os.path.join(outdir, 'Italia_deceduti_oo.png')))
 
+    with Pool(n_proc) as p:
+        html = p.map(plot_regione, sorted(lista_regioni()))
+
     f.write('<H1>Dati regionali</H1>\n')
     for regione in sorted(lista_regioni()):
         f.write('<a href="#%s">%s</a> ' % (regione, regione))
+    f.write('\n')
 
-    for regione in sorted(lista_regioni()):
-        print(regione)
-        f.write('<H2>%s</H2><a name="%s"></a>' % (regione, regione))
-        p = CovidPlot('it', title=regione)
-        p.plot(*dati_regione(regione, 'totale_casi'), label='Casi totali', **Styles.totalecasi)
-        p.plot(*dati_regione(regione, 'terapia_intensiva'), label='Terapia intensiva', **Styles.ti)
-        p.plot(*dati_regione(regione, 'deceduti'), label='Deceduti', **Styles.deceduti)
-        p.expfit(*dati_regione(regione, 'totale_casi'), **Styles.expfit1)
-        p.expfit(*dati_regione(regione, 'deceduti'), **Styles.expfit2)
-        f.write(p.save(os.path.join(outdir,'%s.png' % regione)))
-
-        p = DailyPlot('it', title='%s - casi giornalieri' % regione)
-        p.plot(*dati_regione(regione, 'totale_casi'), label='Nuovi casi', **Styles.totalecasi)
-        p.plot(*dati_regione(regione, 'deceduti'), label='Deceduti', **Styles.deceduti)
-        f.write(p.save(os.path.join(outdir, '%s_giornalieri.png' % regione)))
-
-        p = TestsPlot('it', title='%s - tamponi' % regione)
-        data, totale_casi = dati_regione(regione, 'totale_casi')
-        _, tamponi = dati_regione(regione, 'tamponi')
-        nuovi_casi = totale_casi[1:] - totale_casi[:-1]
-        nuovi_tamponi = tamponi[1:] - tamponi[:-1]
-        p.plot(data.to_numpy()[1:], nuovi_tamponi, label='Tamponi', width=0.40, color='gray')
-        p.plot(data.to_numpy()[1:], nuovi_casi, label='Nuovi casi', shift=0.40, width=0.40, color='red')
-        f.write(p.save(os.path.join(outdir, '%s_tamponi.png' % regione)))
-
-        p = OOPlot('it', title='%s - numero di casi' % regione)
-        _, totale_casi = dati_regione(regione, 'totale_casi')
-        p.plot(totale_casi, smooth=False, **Styles.faintline)
-        p.plot(totale_casi)
-        f.write(p.save(os.path.join(outdir, '%s_casi_oo.png' % regione)))
-
-        p = OOPlot('it', title='%s - decessi' % regione,
-                   xlabel='NumberOfDeaths',
-                   ylabel='NumberOfDailyDeaths')
-        _, totale_casi = dati_regione(regione, 'deceduti')
-        p.plot(totale_casi, smooth=False, **Styles.faintline)
-        p.plot(totale_casi)
-        f.write(p.save(os.path.join(outdir, '%s_deceduti_oo.png' % regione)))
+    f.write('\n'.join(html))
 
 
+    with Pool(n_proc) as p:
+        html = p.map(plot_provincia, sorted(lista_province()))
 
     f.write('<H1>Dati provinciali</H1>\n')
     for provincia in sorted(lista_province()):
-        print(provincia)
-        p = CovidPlot('it', title=provincia, ymax=1e5)
-        p.plot(*casi_provincia(provincia), label='Casi totali', **Styles.totalecasi)
-        p.expfit(*casi_provincia(provincia), **Styles.expfit1)
-        f.write(p.save(os.path.join(outdir,'%s.png' % provincia)))
-
-        p = DailyPlot('it', title='%s - casi giornalieri' % provincia)
-        p.plot(*casi_provincia(provincia), label='Nuovi casi', **Styles.totalecasi)
-        f.write(p.save(os.path.join(outdir, '%s_giornalieri.png' % provincia)))
-
-        p = OOPlot('it', title='%s - numero di casi' % provincia)
-        _, totale_casi = casi_provincia(provincia)
-        p.plot(totale_casi, smooth=False, **Styles.faintline)
-        p.plot(totale_casi)
-        f.write(p.save(os.path.join(outdir, '%s_casi_oo.png' % provincia)))
+        f.write('<a href="#%s">%s</a> ' % (provincia, provincia))
+    f.write('\n')
+    f.write('\n'.join(html))
 
     f.write(open('footer.html', 'r').read())
 
