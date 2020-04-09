@@ -7,10 +7,14 @@ from datetime import date, timedelta
 
 from covid import i18n, Styles, CovidPlot, DailyPlot, OOPlot
 
-csv_dir = '../COVID-19-world/csse_covid_19_data/csse_covid_19_daily_reports'
 
-homedir = os.getenv('HOME')
-outdir = os.path.join(homedir, 'public_html/coronavirus/us')
+try:
+    from my_config_us import csv_dir, outdir
+
+except ModuleNotFoundError:
+    csv_dir = '../COVID-19-world/csse_covid_19_data/csse_covid_19_daily_reports'
+    homedir = os.getenv('HOME')
+    outdir = os.path.join(homedir, 'public_html/coronavirus/us')
 
 last_update = sys.argv[1]
 

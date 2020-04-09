@@ -194,7 +194,9 @@ class OOPlot():
         if smooth:
             if len(series) < wsize+2:
                 return
-            x = savgol_filter(series, wsize, order)
+            log_series = np.log(series)
+            x = savgol_filter(log_series, wsize, order)
+            x = np.exp(x)
         else:
             x = series
         daily = x[1:] - x[:-1]

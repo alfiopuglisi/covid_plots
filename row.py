@@ -6,17 +6,16 @@ import pandas as pd
 
 from covid import i18n, Styles, CovidPlot, DailyPlot, OOPlot
 
-csv_dir = '../COVID-19-world/csse_covid_19_data/csse_covid_19_time_series'
-#csv_confirmed = os.path.join(csv_dir, 'time_series_19-covid-Confirmed.csv')
-#csv_recovered = os.path.join(csv_dir, 'time_series_19-covid-Recovered.csv')
-#csv_deaths    = os.path.join(csv_dir, 'time_series_19-covid-Deaths.csv')
+try:
+    from my_config_row import csv_dir, outdir
+
+except ModuleNotFoundError:
+    csv_dir = '../COVID-19-world/csse_covid_19_data/csse_covid_19_time_series'
+    homedir = os.getenv('HOME')
+    outdir = os.path.join(homedir, 'public_html/coronavirus/world')
 
 csv_confirmed = os.path.join(csv_dir, 'time_series_covid19_confirmed_global.csv')
 csv_deaths    = os.path.join(csv_dir, 'time_series_covid19_deaths_global.csv')
-
-
-homedir = os.getenv('HOME')
-outdir = os.path.join(homedir, 'public_html/coronavirus/world')
 
 last_update = sys.argv[1]
 

@@ -7,12 +7,19 @@ import pandas as pd
 
 from covid import i18n, Styles, CovidPlot, DailyPlot, Table, TestsPlot, OOPlot
 
-csv_province = '../COVID-19-italia/dati-province/dpc-covid19-ita-province.csv'
-csv_regioni = '../COVID-19-italia/dati-regioni/dpc-covid19-ita-regioni.csv'
-csv_nazione = '../COVID-19-italia/dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv'
+try:
+    from my_config_italia import csv_dir, outdir
 
-homedir = os.getenv('HOME')
-outdir = os.path.join(homedir, 'public_html/coronavirus/italia')
+except ModuleNotFoundError:
+    csv_dir = '../COVID-19-italia'
+    homedir = os.getenv('HOME')
+    outdir = os.path.join(homedir, 'public_html/coronavirus/italia')
+
+
+csv_province = os.path.join(csv_dir, 'dati-province/dpc-covid19-ita-province.csv')
+csv_regioni = os.path.join(csv_dir, 'dati-regioni/dpc-covid19-ita-regioni.csv')
+csv_nazione = os.path.join(csv_dir, 'dati-andamento-nazionale/dpc-covid19-ita-andamento-nazionale.csv')
+
 
 last_update=sys.argv[1]
 
