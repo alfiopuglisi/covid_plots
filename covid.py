@@ -4,10 +4,8 @@ import random
 import os.path
 import numpy as np
 from scipy.signal import savgol_filter
-from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-#import statsmodels.api as sm
 
 
 
@@ -188,7 +186,7 @@ class OOPlot():
             plt.title(title)
         self.legend=False
 
-    def plot(self, series, wsize=15, order=2, smooth=True, **kwargs):
+    def plot(self, series, wsize=15, order=3, smooth=True, **kwargs):
 
         series = series[np.where(series>=10)]
         if smooth:
