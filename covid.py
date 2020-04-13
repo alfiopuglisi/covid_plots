@@ -200,13 +200,6 @@ class OOPlot():
         daily = x[1:] - x[:-1]
         plt.plot(x[1:], daily, **kwargs)
 
-#        daily = series[1:] -  series[:-1]
-#        if smooth:
-#            lowess = sm.nonparametric.lowess(daily, series[1:], 0.1)
-#            plt.plot(lowess[:,0], lowess[:,1], **kwargs)
-#        else:
-#            plt.plot(series[1:], daily, **kwargs)
-
         if 'legend' in kwargs:
             self.legend=True
 
